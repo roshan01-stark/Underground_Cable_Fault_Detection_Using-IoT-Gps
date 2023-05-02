@@ -1,0 +1,98 @@
+#include <SoftwareSerial.h>
+#include <TinyGPS++.h>
+#include <Adafruit_FONA.h>
+#include <Adafruit_SleepyDog.h>
+
+#define TDR_PIN 2
+#define THRESHOLD 50 // Threshold value for detecting cable faults
+#define DELAY_TIME 500 // Time delay between measurements in milliseconds
+
+#define FONA_RX 10
+#define FONA_TX 11
+#define FONA_RST 4
+
+SoftwareSerial fonaSS = SoftwareSerial(FONA_TX, FONA_RX);
+Adafruit_FONA fona = Adafruit_FONA(FONA_RST);
+
+TinyGPSPlus gps;
+
+void setup() {
+  pinMode(TDR_PIN, OUTPUT);
+  digitalWrite(TDR_PIN, LOW);
+  Serial.begin(9600);
+  fonaSS.begin(4800);
+  while (!fona.begin(fonaSS)) {
+    Serial.println("Couldn't find FONA");
+    delay(500);
+  }
+  fona.setGPRSNetworkSettings(F("internet"), F(""), F(""));
+  fona.enableGPRS(true);
+  fona.setGPS(Adafruit_FONA::GPS_ENABLE);
+}
+
+void loop() {
+  if (gps.location.isValid()) {
+    String gps_data = String(gps.location.lat(), 6) + "," + String(gps.location.lng(), 6);
+
+    digitalWrite(TDR_PIN, HIGH);
+    delayMicroseconds(10);
+    digitalWrite(TDR_PIN, LOW);
+
+    int tdr_value = analogRead(A0);
+    if (tdr_value > THRESHOLD) {
+      Serial.println("Cable fault detected!");
+      send_notification(gps_data);
+      // TODO: Take appropriate action for cable fault detection
+    }
+
+    gps_data = "";
+    gps.clearLocation();
+  }
+
+  while (fona.available()) {
+    char c = fona.read();
+    if (gps.encode(c)) {
+      watchdogEnable(8000);
+    }
+  }
+
+  delay(DELAY_TIME);
+}
+
+void send_notification(String gps_data) {
+  String cmd = "AT+SAPBR=3,1,\"Contype\",\"GPRS\"\r\n";
+  fonaSS.print(cmd);
+  delay(500);
+
+  cmd = "AT+SAPBR=3,1,\"APN\",\"internet\"\r\n";
+  fonaSS.print(cmd);
+  delay(500);
+
+  cmd = "AT+SAPBR=1,1\r\n";
+  fonaSS.print(cmd);
+  delay(5000);
+
+  cmd = "AT+HTTPINIT\r\n";
+  fonaSS.print(cmd);
+  delay(500);
+
+  cmd = "AT+HTTPPARA=\"CID\",1\r\n";
+  fonaSS.print(cmd);
+  delay(500);
+
+  cmd = "AT+HTTPPARA=\"URL\",\"http://your-server.com/notify.php?gps=" + gps_data + "\"\r\n";
+  fonaSS.print(cmd);
+  delay(500);
+
+  cmd = "AT+HTTPACTION=0\r\n";
+  fonaSS.print(cmd);
+  delay(10000);
+
+  cmd = "AT+HTTPTERM\r\n";
+  fonaSS.print(cmd);
+  delay(500);
+
+  cmd = "AT+SAPBR=0,1\r\n";
+  fonaSS.print(cmd);
+  delay(5000);
+}

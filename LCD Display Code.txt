@@ -1,0 +1,39 @@
+#include <LiquidCrystal.h>
+#include <SoftwareSerial.h>
+
+#define TDR_PIN 2
+#define THRESHOLD 50 // Threshold value for detecting cable faults
+#define DELAY_TIME 500 // Time delay between measurements in milliseconds
+
+LiquidCrystal lcd(12, 11, 5, 4, 3, 2); // Initialize the LCD display
+SoftwareSerial mySerial(10, 11); // RX, TX
+
+void setup() {
+  pinMode(TDR_PIN, OUTPUT);
+  digitalWrite(TDR_PIN, LOW);
+  Serial.begin(9600);
+  mySerial.begin(9600);
+  lcd.begin(16, 2); // Initialize the LCD display with 16 columns and 2 rows
+  lcd.print("Underground Cable"); // Display initial message on the LCD
+  lcd.setCursor(0, 1);
+  lcd.print("Fault Detection");
+}
+
+void loop() {
+  digitalWrite(TDR_PIN, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(TDR_PIN, LOW);
+
+  int tdr_value = mySerial.parseInt();
+  if (tdr_value > THRESHOLD) {
+    Serial.println("Cable fault detected!");
+    lcd.clear();
+    lcd.print("Cable Fault Detected!"); // Display cable fault message on the LCD
+    // TODO: Take appropriate action for cable fault detection
+  } else {
+    lcd.clear();
+    lcd.print("No Cable Fault"); // Display no cable fault message on the LCD
+  }
+
+  delay(DELAY_TIME);
+}

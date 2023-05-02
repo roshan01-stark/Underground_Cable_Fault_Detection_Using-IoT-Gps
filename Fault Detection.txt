@@ -1,0 +1,28 @@
+#include <SoftwareSerial.h>
+
+#define TDR_PIN 2
+#define THRESHOLD 50 // Threshold value for detecting cable faults
+#define DELAY_TIME 500 // Time delay between measurements in milliseconds
+
+SoftwareSerial mySerial(10, 11); // RX, TX
+
+void setup() {
+  pinMode(TDR_PIN, OUTPUT);
+  digitalWrite(TDR_PIN, LOW);
+  Serial.begin(9600);
+  mySerial.begin(9600);
+}
+
+void loop() {
+  digitalWrite(TDR_PIN, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(TDR_PIN, LOW);
+
+  int tdr_value = mySerial.parseInt();
+  if (tdr_value > THRESHOLD) {
+    Serial.println("Cable fault detected!");
+    // TODO: Take appropriate action for cable fault detection
+  }
+
+  delay(DELAY_TIME);
+}
